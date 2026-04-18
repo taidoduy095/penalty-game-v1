@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Game Hub FINAL PRO MAX</title>
+
+<style>
+body{background:#0b0f1a;color:#fff;font-family:sans-serif;text-align:center}
+button,input{padding:10px;margin:5px;border-radius:8px;border:none}
+.hidden{display:none}
+#topbar{position:fixed;top:10px;right:10px;background:#111;padding:10px;border-radius:10px}
+.card{font-size:60px;margin:10px}
+#circle{
+width:120px;height:120px;border-radius:50%;
+border:3px solid #00ffcc;margin:auto;
+display:flex;align-items:center;justify-content:center;
+font-size:28px;
+}
+</style>
+</head>
+
+<body>
+
+<audio id="bgm" src="wavin-flag.mp3" loop></audio>
+
+<div id="auth">
+<h3>LOGIN / REGISTER</h3>
+<input id="u" placeholder="User"><br>
+<input id="p" type="password" placeholder="Pass"><br>
+<button onclick="register()">Register</button>
+<button onclick="login()">Login</button>
+</div>
+
+<div id="menu" class="hidden">
+<h2>MENU</h2>
+<button onclick="show('tx')">🍎 Táo Sữa</button>
+<button onclick="show('pen')">⚽ Penalty</button>
+<button onclick="show('card')">🃏 Bài Tây</button>
+<button id="adminBtn" class="hidden" onclick="show('admin')">👑 Admin</button>
+</div>
+
+<div id="topbar">
+💰 <span id="coin">0</span><br>
+👤 <span id="user"></span>
+</div>
+
+<!-- TÁO SỮA -->
+<div id="tx" class="hidden">
+<h3>🍎 Táo / 🥛 Sữa</h3>
+<div id="circle">30</div>
+<h2 id="dice">🎲🎲🎲</h2>
+
+<input id="betTX" placeholder="Cược"><br>
+<button onclick="betTXGame('tao')">Táo</button>
+<button onclick="betTXGame('sua')">Sữa</button>
+
+<p id="txInfo"></p>
+<button onclick="show('menu')">⬅</button>
+</div>
+
+<!-- PENALTY -->
+<div id="pen" class="hidden">
+<h3>⚽ PENALTY</h3>
+<input id="betP" placeholder="Cược">
+
+<button onclick="penalty('left')">Trái</button>
+<button onclick="penalty('center')">Giữa</button>
+<button onclick="penalty('right')">Phải</button>
+
+<p id="resP"></p>
+<button onclick="show('menu')">⬅</button>
+</div>
+
+<!-- CARD -->
+<div id="card" class="hidden">
+<h3>🃏 HIGH / LOW</h3>
+<input id="betC" placeholder="Cược" oninput="dealFirstCard()">
+
+<div class="card" id="cardShow">?</div>
+<p id="infoC"></p>
+
+<button onclick="pick('low')">Nhỏ hơn</button>
+<button onclick="pick('high')">Lớn hơn</button>
+
+<p id="resC"></p>
+<button onclick="show('menu')">⬅</button>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="hidden">
+<h2>👑 ADMIN PANEL</h2>
+<input id="rate" type="number" placeholder="% win">
+<button onclick="setRate()">SET</button>
+<p id="rateShow"></p>
+<button onclick="show('menu')">⬅</button>
+</div>
+
+<script>
+
+let user=null;
+let users=JSON.parse(localStorage.getItem("users"))||{};
+let winRate=+localStorage.getItem("winRate")||50;
+
+if(!users.admin){
+users.admin={pass:"123",coin:999999};
+}
+
+let music=false;
+document.body.addEventListener("click",()=>{
+if(!music){
+document.getElementById("bgm").play().catch(()=>{});
+music=true;
+}
+});
+
+function save(){
+localStorage.setItem("users",JSON.stringify(users));
+localStorage.setItem("winRate",winRate);
+}
+
+function register(){
+let n=u(),p=pw();
+if(!n||!p)return;
+if(users[n]) return alert("Tồn tại");
+
+users[n]={pass:p,coin:5000};
+save();
+alert("OK");
+}
+
+function login(){
+let n=u(),p=pw();
+
+if(n==="mtgamingg09" && p==="123"){
+user="admin";
+document.getElementById("adminBtn").classList.remove("hidden");
+show("admin");
+update();
+return;
+}
+
+if(!users[n]||users[n].pass!==p) return alert("Sai");
+
+user=n;
+document.getElementById("adminBtn").classList.add("hidden");
+
+show("menu");
+update();
+}
+
+function show(id){
+["auth","menu","tx","pen","card","admin"].forEach(x=>{
+document.getElementById(x).classList.add("hidden");
+});
+document.getElementById(id).classList.remove("hidden");
+
+if(id==="tx") startTX();
+}
+
+function update(){
+document.getElementById("coin").innerText=users[user].coin;
+document.getElementById("user").innerText=user;
+}
+
+//////////////////// TÁO SỮA ////////////////////
+
+let txTimer=30;
+let txInterval=null;
+let bets={};
+
+function startTX(){
+clearInterval(txInterval);
+txTimer=30;
+bets={};
+
+txInterval=setInterval(()=>{
+txTimer--;
+document.getElementById("circle").innerText=txTimer;
+
+if(txTimer<=0){
+clearInterval(txInterval);
+endTX();
+startTX();
+}
+},1000);
+}
+
+function betTXGame(type){
+
+let bet=+document.getElementById("betTX").value;
+if(!bet||bet<=0)return;
+
+if(users[user].coin<bet) return alert("Không đủ tiền");
+
+// ✅ TRỪ NGAY
+users[user].coin -= bet;
+
+bets[user]={type,bet};
+
+document.getElementById("txInfo").innerText=
+"Đã cược "+bet+" vào "+type;
+
+update();
+save();
+}
+
+function endTX(){
+
+let d1=Math.floor(Math.random()*6)+1;
+let d2=Math.floor(Math.random()*6)+1;
+let d3=Math.floor(Math.random()*6)+1;
+
+let total=d1+d2+d3;
+
+document.getElementById("dice").innerText=
+`${d1} - ${d2} - ${d3} = ${total}`;
+
+let result = total>10 ? "tao":"sua";
+
+if(bets[user]){
+let {type,bet}=bets[user];
+
+if(type===result){
+users[user].coin += bet*2;
+document.getElementById("txInfo").innerText="✅ Thắng";
+}else{
+document.getElementById("txInfo").innerText="❌ Thua";
+}
+}
+
+update();
+save();
+}
+
+//////////////////// PENALTY ////////////////////
+
+let penPlaying=false;
+let penMoney=0;
+let penStreak=0;
+let penMax=10;
+
+function penalty(dir){
+
+let bet=+document.getElementById("betP").value;
+
+if(!penPlaying){
+if(!bet||bet<=0)return;
+if(users[user].coin<bet)return alert("Không đủ tiền");
+
+users[user].coin-=bet;
+penMoney=bet;
+penStreak=0;
+penPlaying=true;
+}
+
+let gk=["left","center","right"][Math.floor(Math.random()*3)];
+
+setTimeout(()=>{
+
+if(dir===gk){
+document.getElementById("resP").innerText="❌ Thua hết";
+penPlaying=false;
+penMoney=0;
+}else{
+penMoney*=2;
+penStreak++;
+
+document.getElementById("resP").innerText=
+"✅ x"+penStreak+" | "+penMoney;
+
+if(penStreak>=penMax){
+users[user].coin+=penMoney;
+penPlaying=false;
+}else{
+if(!confirm("Tiếp không?")){
+users[user].coin+=penMoney;
+penPlaying=false;
+}
+}
+}
+
+update();
+save();
+
+},400);
+}
+
+//////////////////// CARD ////////////////////
+
+let deck=[];
+let i=0;
+let currentCard=null;
+let cardDealt=false;
+let rewardRate=1.8;
+
+function build(){
+let v=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+deck=v.sort(()=>Math.random()-0.5);
+i=0;
+}
+build();
+
+function val(c){
+if(c==="A")return 1;
+if(c==="J")return 11;
+if(c==="Q")return 12;
+if(c==="K")return 13;
+return +c;
+}
+
+function dealFirstCard(){
+if(cardDealt) return;
+
+if(i>=deck.length-1) build();
+
+currentCard=deck[i++];
+cardDealt=true;
+
+document.getElementById("cardShow").innerText=currentCard;
+document.getElementById("infoC").innerText="Lá hiện tại";
+document.getElementById("resC").innerText="";
+}
+
+function pick(type){
+
+let bet=+document.getElementById("betC").value;
+if(!bet||!currentCard)return;
+
+if(users[user].coin<bet)return alert("Không đủ tiền");
+
+let nextCard=deck[i++];
+
+let win=
+(type==="high" && val(nextCard)>val(currentCard))||
+(type==="low" && val(nextCard)<val(currentCard));
+
+users[user].coin-=bet;
+
+if(win){
+users[user].coin+=bet*rewardRate;
+document.getElementById("resC").innerText="✅ x"+rewardRate;
+}else{
+document.getElementById("resC").innerText="❌ Thua";
+}
+
+document.getElementById("cardShow").innerText=nextCard;
+document.getElementById("infoC").innerText="Lá trước: "+currentCard;
+
+currentCard=null;
+cardDealt=false;
+
+update();
+save();
+}
+
+//////////////////// ADMIN ////////////////////
+
+function setRate(){
+let r=+document.getElementById("rate").value;
+if(r<0||r>100)return;
+
+winRate=r;
+save();
+
+document.getElementById("rateShow").innerText="Win rate: "+winRate+"%";
+}
+
+// utils
+function u(){return document.getElementById("u").value}
+function pw(){return document.getElementById("p").value}
+
+</script>
+</body>
+  </html>
